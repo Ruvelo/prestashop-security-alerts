@@ -1,0 +1,260 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quality:
+    name: Coding standard and static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: PrestaShop coding standard
+        run: composer lint
+
+      - name: Static analysis (PHPStan level 6, PrestaShop stubs)
+        run: composer analyse
+
+  tests:
+    name: Unit tests · PHP ${{ matrix.php }} · ${{ matrix.stability }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+        stability: [prefer-stable, prefer-lowest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --${{ matrix.stability }} --prefer-dist --no-interaction --no-progress
+
+      - name: Unit tests
+        run: vendor/bin/phpunit
+
+  zip:
+    name: Release zip builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Build
+        run: bin/build-zip.sh build/ruvelo_securityalerts.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ruvelo_securityalerts-zip
+          path: build/ruvelo_securityalerts.zip
+
+  install:
+    name: Real install · PrestaShop ${{ matrix.prestashop }} · PHP ${{ matrix.php }}
+    needs: zip
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - prestashop: '8.1.7'
+            php: '8.2'
+          - prestashop: '8.2.8'
+            php: '8.3'
+          - prestashop: '9.0.3'
+            php: '8.3'
+          - prestashop: '9.2.0'
+            php: '8.4'
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: prestashop
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      PS: ${{ github.workspace }}/shop
+      BASE_URL: http://127.0.0.1:8080
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: 'Admin12345!x'
+      ARTIFACTS: ${{ github.workspace }}/artifacts
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, dom, fileinfo, gd, intl, mbstring, openssl, pdo_mysql, simplexml, zip
+          ini-values: memory_limit=-1, display_errors=Off, error_reporting=E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED
+          coverage: none
+          tools: composer:v2
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ruvelo_securityalerts-zip
+          path: dist
+
+      - name: Unpack PrestaShop ${{ matrix.prestashop }}
+        run: .github/ci/fetch-prestashop.sh '${{ matrix.prestashop }}' "$PS"
+
+      - name: Install PrestaShop from the command line
+        working-directory: shop
+        run: |
+          php install/index_cli.php \
+            --domain=127.0.0.1:8080 --db_server=127.0.0.1 --db_name=prestashop --db_user=root --db_password=root \
+            --db_create=0 --prefix=ps_ --name=Ci --country=gb --language=en --timezone=UTC \
+            --firstname=Ci --lastname=Admin --email="$ADMIN_EMAIL" --password="$ADMIN_PASSWORD" \
+            --newsletter=0 --send_email=0 --ssl=0
+          rm -rf install
+          ls -d admin*
+          cat app/AppKernel.php | grep -m1 'VERSION' || true
+          php -r 'require "config/config.inc.php"; echo "PrestaShop ", _PS_VERSION_, PHP_EOL;'
+
+      - name: Install the module from the release zip
+        working-directory: shop
+        run: |
+          unzip -q ../dist/ruvelo_securityalerts.zip -d modules/
+          ls modules/ruvelo_securityalerts
+          php bin/console prestashop:module install ruvelo_securityalerts
+          # New services (the console command, the routes) are picked up when the container is rebuilt.
+          php bin/console cache:clear 2>&1 | tail -3
+
+      - name: The table and the settings exist
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot prestashop -e 'DESCRIBE ps_ruvelo_securityalerts_finding'
+          mysql -h 127.0.0.1 -uroot -proot prestashop -e "SELECT name FROM ps_configuration WHERE name LIKE 'RUVELO_SA_%'"
+          mysql -h 127.0.0.1 -uroot -proot prestashop -e "SELECT class_name, route_name, id_parent FROM ps_tab WHERE class_name='AdminRuveloSecurityAlerts'"
+          mysql -h 127.0.0.1 -uroot -proot prestashop -e "SELECT h.name FROM ps_hook h JOIN ps_hook_module hm USING (id_hook) JOIN ps_module m USING (id_module) WHERE m.name='ruvelo_securityalerts'"
+
+      - name: A local SMTP server to catch the alert email
+        run: |
+          pip install --quiet aiosmtpd
+          nohup python3 .github/ci/smtp-sink.py "$RUNNER_TEMP/mail" > "$RUNNER_TEMP/smtp.log" 2>&1 &
+          sleep 2; cat "$RUNNER_TEMP/smtp.log"
+          M="mysql -h 127.0.0.1 -uroot -proot prestashop"
+          $M -e "UPDATE ps_configuration SET value=2 WHERE name='PS_MAIL_METHOD'; UPDATE ps_configuration SET value='127.0.0.1' WHERE name='PS_MAIL_SERVER'; UPDATE ps_configuration SET value='1025' WHERE name='PS_MAIL_SMTP_PORT'; UPDATE ps_configuration SET value='off' WHERE name='PS_MAIL_SMTP_ENCRYPTION'; UPDATE ps_configuration SET value='' WHERE name IN ('PS_MAIL_USER','PS_MAIL_PASSWD'); UPDATE ps_configuration SET value='ci-owner@example.com' WHERE name='RUVELO_SA_EMAILS'"
+
+      - name: Plant two vulnerable stub modules
+        working-directory: shop
+        run: |
+          # Folders with a config.xml and nothing else, named after modules Friends of Presta have
+          # published advisories for, at versions those advisories cover. They are not installed.
+          mkdir -p modules/upsshipping modules/advancedpopupcreator
+          printf '<?xml version="1.0"?><module><name>upsshipping</name><version>2.4.0</version><author>Agence Web 360</author></module>' > modules/upsshipping/config.xml
+          printf '<?xml version="1.0"?><module><name>advancedpopupcreator</name><version>1.2.0</version><author>Idnovate</author></module>' > modules/advancedpopupcreator/config.xml
+
+      - name: Console command, with real network access
+        working-directory: shop
+        run: |
+          php bin/console list ruvelo
+          set +e
+          php bin/console ruvelo:security-alerts:check --json > "$RUNNER_TEMP/check.json" 2> "$RUNNER_TEMP/check.err"
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/check.err"; head -c 3000 "$RUNNER_TEMP/check.json"; echo
+          echo "exit code: $code"
+          python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); assert {"clean","complete","packages","counts","problems","findings","notes"} <= d.keys(); print("valid JSON,", len(d["findings"]), "findings,", sum(d["packages"].values()), "packages, problems:", d["problems"])' "$RUNNER_TEMP/check.json"
+          [ "$code" -le 1 ] || { echo "::error::exit code $code means a source failed"; exit 1; }
+          python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); pk={f["package"] for f in d["findings"]}; assert {"upsshipping","advancedpopupcreator"} <= pk, pk; print("Friends of Presta findings found:", sorted(pk))' "$RUNNER_TEMP/check.json"
+
+      - name: The alert was emailed once, and says what it should
+        working-directory: shop
+        run: |
+          ls "$RUNNER_TEMP/mail"
+          [ "$(ls "$RUNNER_TEMP/mail" | wc -l)" = 1 ] || { echo "::error::expected exactly one email"; exit 1; }
+          python3 -I - "$RUNNER_TEMP/mail" <<'PY'
+          import email, email.policy, glob, sys
+          msg = email.message_from_bytes(open(glob.glob(sys.argv[1] + "/*.eml")[0], "rb").read(), policy=email.policy.default)
+          body = msg.get_body(preferencelist=("plain", "html")).get_content() + "".join(
+              part.get_content() for part in msg.walk() if part.get_content_type() == "text/html")
+          print("Subject:", msg["Subject"], "| To:", msg["To"])
+          assert "ci-owner@example.com" in msg["To"], msg["To"]
+          assert "upsshipping" in body and "advancedpopupcreator" in body, body[:500]
+          assert "valtry" not in (body + msg["Subject"]).lower()
+          PY
+          M="mysql -h 127.0.0.1 -uroot -proot prestashop"
+          $M -e 'SELECT COUNT(*) AS findings_stored, SUM(notified) AS findings_notified FROM ps_ruvelo_securityalerts_finding'
+          [ "$($M -N -e 'SELECT COUNT(*)-SUM(notified) FROM ps_ruvelo_securityalerts_finding')" = 0 ]
+          php bin/console ruvelo:security-alerts:check > /dev/null || true
+          [ "$(ls "$RUNNER_TEMP/mail" | wc -l)" = 1 ] || { echo "::error::a second check sent another email"; exit 1; }
+
+      - name: Console command, dry run and --fail-on
+        working-directory: shop
+        run: |
+          set +e
+          php bin/console ruvelo:security-alerts:check --dry-run --json --fail-on=any > "$RUNNER_TEMP/dry.json"
+          any=$?
+          php bin/console ruvelo:security-alerts:check --fail-on=nonsense
+          bad=$?
+          set -e
+          python3 -I -c 'import json,sys; json.load(open(sys.argv[1]))' "$RUNNER_TEMP/dry.json"
+          [ "$any" = 1 ] || { echo "::error::--fail-on=any exited $any with findings present, expected 1"; exit 1; }
+          [ "$bad" = 2 ] || { echo "::error::an invalid --fail-on exited $bad, expected 2"; exit 1; }
+
+      - name: Serve the shop
+        working-directory: shop
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot prestashop -e "UPDATE ps_configuration SET value='127.0.0.1:8080' WHERE name IN ('PS_SHOP_DOMAIN','PS_SHOP_DOMAIN_SSL'); UPDATE ps_shop_url SET domain='127.0.0.1:8080', domain_ssl='127.0.0.1:8080'; UPDATE ps_configuration SET value=0 WHERE name IN ('PS_SSL_ENABLED','PS_SSL_ENABLED_EVERYWHERE')"
+          php bin/console cache:clear --no-warmup 2>&1 | tail -3 || true
+          PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:8080 -t . > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 30); do curl -s -o /dev/null "$BASE_URL/" && break; sleep 1; done
+          mkdir -p "$ARTIFACTS"
+
+      - name: Back office, cron URL and dashboard widget
+        run: .github/ci/smoke.sh
+
+      - name: Screenshots of the real back office
+        run: |
+          pip install --quiet playwright
+          python3 -m playwright install --with-deps chromium >/dev/null
+          python3 .github/ci/screenshots.py
+
+      - name: Uninstall cleans up
+        working-directory: shop
+        run: |
+          php bin/console prestashop:module uninstall ruvelo_securityalerts
+          left=$(mysql -h 127.0.0.1 -uroot -proot prestashop -N -e "SELECT (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='prestashop' AND table_name='ps_ruvelo_securityalerts_finding') + (SELECT COUNT(*) FROM ps_configuration WHERE name LIKE 'RUVELO_SA_%') + (SELECT COUNT(*) FROM ps_tab WHERE class_name='AdminRuveloSecurityAlerts')")
+          echo "leftovers: $left"
+          [ "$left" = 0 ] || { echo "::error::uninstall left $left things behind"; exit 1; }
+
+      - name: Logs on failure
+        if: failure()
+        run: |
+          tail -n 60 "$RUNNER_TEMP/server.log" 2>/dev/null || true
+          tail -n 80 shop/var/logs/*.log 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backoffice-${{ matrix.prestashop }}
+          path: artifacts
+          if-no-files-found: ignore
