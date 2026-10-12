@@ -1,0 +1,52 @@
+[
+ {
+  "title": "[CVE-2026-39079] Sensitive data exposure via publicly accessible logs in upsshipping module from Agence Web 360 for PrestaShop",
+  "url": "/modules/2026/05/21/upsshipping-cve-2026-39079.html",
+  "category": "modules",
+  "author": "Esokia.com, Profileo.com / 772424.com",
+  "severity": "high (8.6)",
+  "tags": "CVE,PrestaShop,upsshipping",
+  "date": "21 May 2026",
+  "license": "This advisory and patch is licensed under https://creativecommons.org/licenses/by-sa/4.0/"
+ },
+ {
+  "title": "[CVE-2025-69633] Improper neutralization of SQL parameters in Advanced Popup Creator module from Idnovate for PrestaShop",
+  "url": "/modules/2026/02/16/advancedpopupcreator-cve-2025-69633.html",
+  "category": "modules",
+  "author": "Esokia.com, Profileo.com / 772424.com",
+  "severity": "critical (9.8)",
+  "tags": "CVE,PrestaShop,advancedpopupcreator",
+  "date": "16 February 2026",
+  "license": "This advisory and patch is licensed under https://creativecommons.org/licenses/by-sa/4.0/"
+ },
+ {
+  "title": "[CVE-2025-61922] Customer account takeover via email in PrestaShop Checkout module for PrestaShop",
+  "url": "/modules/2025/10/23/ps_checkout.html",
+  "category": "modules",
+  "author": "PrestaShop SA, Friends-Of-Presta.org",
+  "severity": "critical (9.1)",
+  "tags": "CVE,PrestaShop,ps_checkout",
+  "date": "23 October 2025",
+  "license": "This advisory and patch is licensed under https://creativecommons.org/licenses/by-sa/4.0/"
+ },
+ {
+  "title": "[CVE-2024-6648] Absolute Path Traversal vulnerability in AP Page Builder versions prior to 4.0.0",
+  "url": "/modules/2025/05/22/appagebuilder.html",
+  "category": "modules",
+  "author": "n0d0n, incibe.es",
+  "severity": "high (8.7)",
+  "tags": "CVE,PrestaShop,Addon,Theme,appagebuilder",
+  "date": "22 May 2025",
+  "license": "This advisory and patch is licensed under https://creativecommons.org/licenses/by-sa/4.0/"
+ },
+ {
+  "title": "[CVE-2024-41670] Improperly Implemented Security Check for Standard in PayPal Official for PrestaShop",
+  "url": "/modules/2024/07/26/paypal.html",
+  "category": "modules",
+  "author": "202-ecommerce.com",
+  "severity": "medium (6.5)",
+  "tags": "CVE,PrestaShop,paypal",
+  "date": "26 July 2024",
+  "license": "This advisory and patch is licensed under https://creativecommons.org/licenses/by-sa/4.0/"
+ }
+]
