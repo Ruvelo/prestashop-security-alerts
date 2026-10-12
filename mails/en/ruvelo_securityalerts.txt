@@ -1,0 +1,5 @@
+Security advisories were found for software on {shop_name}:
+
+{findings_text}
+
+Update the module or PrestaShop version listed, or remove it if you don't use it. Flaws marked exploited are being used by attackers right now.

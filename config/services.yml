@@ -1,0 +1,13 @@
+services:
+  _defaults:
+    public: true
+    autowire: true
+    autoconfigure: true
+
+  Ruvelo\PrestaShop\SecurityAlerts\Controller\Admin\AlertsController:
+    class: Ruvelo\PrestaShop\SecurityAlerts\Controller\Admin\AlertsController
+    tags: ['controller.service_arguments']
+
+  Ruvelo\PrestaShop\SecurityAlerts\Command\CheckCommand:
+    class: Ruvelo\PrestaShop\SecurityAlerts\Command\CheckCommand
+    tags: ['console.command']
