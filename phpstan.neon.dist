@@ -1,0 +1,15 @@
+parameters:
+  level: 6
+  paths:
+    - src
+    - ruvelo_securityalerts.php
+    - controllers/front
+    - tests
+  excludePaths:
+    analyse:
+      - vendor
+      - tests/stubs
+  bootstrapFiles:
+    - tests/stubs/prestashop.stub
+    - tests/stubs/symfony-admin.stub
+  tmpDir: .phpstan.cache

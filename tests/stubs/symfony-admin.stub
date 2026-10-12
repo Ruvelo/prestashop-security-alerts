@@ -1,0 +1,79 @@
+<?php
+
+namespace PrestaShopBundle\Controller\Admin;
+
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Response;
+
+class PrestaShopAdminController
+{
+    /** @param array<string, mixed> $parameters */
+    protected function render(string $view, array $parameters = []): Response
+    {
+    }
+
+    /** @param array<string, mixed> $parameters */
+    protected function generateUrl(string $route, array $parameters = []): string
+    {
+    }
+
+    /** @param array<string, mixed> $parameters */
+    protected function redirectToRoute(string $route, array $parameters = []): RedirectResponse
+    {
+    }
+
+    /** @param mixed $message */
+    protected function addFlash(string $type, $message): void
+    {
+    }
+
+    protected function isGranted(string $attribute, mixed $subject = null): bool
+    {
+    }
+
+    protected function isCsrfTokenValid(string $id, ?string $token): bool
+    {
+    }
+}
+
+class FrameworkBundleAdminController extends PrestaShopAdminController
+{
+}
+
+namespace Ruvelo\PrestaShop\SecurityAlerts\Controller\Admin;
+
+class BaseController extends \PrestaShopBundle\Controller\Admin\PrestaShopAdminController
+{
+}
+
+namespace Symfony\Component\HttpFoundation;
+
+class ParameterBag
+{
+    /** @return mixed */
+    public function get(string $key, mixed $default = null)
+    {
+    }
+}
+
+class Request
+{
+    /** @var ParameterBag */
+    public $request;
+    /** @var ParameterBag */
+    public $query;
+}
+
+class Response
+{
+}
+
+class RedirectResponse extends Response
+{
+}
+
+namespace Symfony\Component\Security\Core\Exception;
+
+class AccessDeniedException extends \RuntimeException
+{
+}

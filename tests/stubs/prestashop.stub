@@ -1,0 +1,234 @@
+<?php
+
+// Just enough of PrestaShop for PHPStan to read this module without a shop.
+// The real-install job analyses against the actual PrestaShop with PrestaShop's own configuration.
+
+define('_PS_VERSION_', '8.1.7');
+define('_PS_CACHE_DIR_', '/tmp/');
+define('_PS_MODULE_DIR_', '/tmp/modules/');
+define('_DB_PREFIX_', 'ps_');
+define('_MYSQL_ENGINE_', 'InnoDB');
+
+class Db
+{
+    public static function getInstance(): Db
+    {
+    }
+
+    /** @return array<int, array<string, mixed>>|bool */
+    public function executeS(string $sql)
+    {
+    }
+
+    public function execute(string $sql): bool
+    {
+    }
+
+    /** @param array<string, mixed> $data */
+    public function insert(string $table, array $data): bool
+    {
+    }
+
+    /** @param array<string, mixed> $data */
+    public function update(string $table, array $data, string $where = ''): bool
+    {
+    }
+
+    public function delete(string $table, string $where = ''): bool
+    {
+    }
+}
+
+class Configuration
+{
+    /** @return mixed */
+    public static function get(string $key)
+    {
+    }
+
+    /** @param mixed $value */
+    public static function updateGlobalValue(string $key, $value): bool
+    {
+    }
+
+    public static function deleteByName(string $key): bool
+    {
+    }
+}
+
+function pSQL(string $string, bool $html = false): string
+{
+}
+
+class Context
+{
+    /** @var Link */
+    public $link;
+    /** @var \stdClass */
+    public $shop;
+    /** @var \Smarty */
+    public $smarty;
+
+    public static function getContext(): Context
+    {
+    }
+}
+
+class Smarty
+{
+    /** @param array<string, mixed> $vars */
+    public function assign(array $vars): void
+    {
+    }
+}
+
+class Link
+{
+    /** @param array<string, mixed> $params */
+    public function getModuleLink(string $module, string $controller, array $params = []): string
+    {
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $query
+     */
+    public function getAdminLink(string $controller, bool $withToken = true, array $params = [], array $query = []): string
+    {
+    }
+}
+
+class Language
+{
+    public static function getIsoById(int $id): string
+    {
+    }
+}
+
+class Mail
+{
+    /**
+     * @param array<string, mixed> $vars
+     *
+     * @return bool|int
+     */
+    public static function Send(int $lang, string $template, string $subject, array $vars, string $to, ?string $toName = null, ?string $from = null, ?string $fromName = null, ?array $attachment = null, ?bool $smtp = null, string $templatePath = '', bool $die = false, ?int $idShop = null)
+    {
+    }
+}
+
+class Tools
+{
+    /** @return mixed */
+    public static function getValue(string $key)
+    {
+    }
+
+    public static function isSubmit(string $key): bool
+    {
+    }
+
+    public static function getAdminTokenLite(string $tab): string
+    {
+    }
+}
+
+class HelperForm
+{
+    /** @var mixed */
+    public $module;
+    /** @var mixed */
+    public $table;
+    /** @var mixed */
+    public $default_form_language;
+    /** @var mixed */
+    public $identifier;
+    /** @var mixed */
+    public $submit_action;
+    /** @var mixed */
+    public $currentIndex;
+    /** @var mixed */
+    public $token;
+    /** @var mixed */
+    public $fields_value;
+
+    /** @param array<int, array<string, mixed>> $forms */
+    public function generateForm(array $forms): string
+    {
+    }
+}
+
+class Module
+{
+    /** @var string */
+    public $name;
+    /** @var string */
+    public $tab;
+    /** @var string */
+    public $version;
+    /** @var string */
+    public $author;
+    /** @var int */
+    public $need_instance;
+    /** @var bool */
+    public $bootstrap;
+    /** @var array<string, string> */
+    public $ps_versions_compliancy;
+    /** @var array<int, array<string, mixed>> */
+    public $tabs;
+    /** @var string */
+    public $displayName;
+    /** @var string */
+    public $description;
+    /** @var string */
+    public $confirmUninstall;
+    /** @var Context */
+    public $context;
+    /** @var string */
+    public $table;
+    /** @var string */
+    public $identifier;
+
+    public function __construct()
+    {
+    }
+
+    public function install(): bool
+    {
+    }
+
+    public function uninstall(): bool
+    {
+    }
+
+    public function registerHook(string $hook): bool
+    {
+    }
+
+    /** @param array<string, mixed> $params */
+    public function trans(string $id, array $params = [], ?string $domain = null): string
+    {
+    }
+
+    public function display(string $file, string $template): string
+    {
+    }
+
+    public function displayError(string $msg): string
+    {
+    }
+
+    public function displayConfirmation(string $msg): string
+    {
+    }
+}
+
+class ModuleFrontController
+{
+    /** @var bool */
+    public $ajax;
+    /** @var bool */
+    public $ssl;
+    /** @var bool */
+    public $auth;
+}
