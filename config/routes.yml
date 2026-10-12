@@ -1,0 +1,14 @@
+ruvelo_securityalerts_index:
+  path: /ruvelo_securityalerts/alerts
+  methods: [GET]
+  defaults:
+    _controller: 'Ruvelo\PrestaShop\SecurityAlerts\Controller\Admin\AlertsController::indexAction'
+    _legacy_controller: AdminRuveloSecurityAlerts
+    _legacy_link: AdminRuveloSecurityAlerts
+
+ruvelo_securityalerts_check:
+  path: /ruvelo_securityalerts/alerts/check
+  methods: [POST]
+  defaults:
+    _controller: 'Ruvelo\PrestaShop\SecurityAlerts\Controller\Admin\AlertsController::checkAction'
+    _legacy_controller: AdminRuveloSecurityAlerts

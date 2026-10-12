@@ -1,0 +1,86 @@
+{% extends '@PrestaShop/Admin/layout.html.twig' %}
+
+{% block content %}
+<div class="card" id="ruvelo-alerts">
+  <div class="card-header">
+    <h3 class="card-header-title">
+      {{ 'Security alerts'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}
+    </h3>
+  </div>
+  <div class="card-body">
+    {% if exploitedCount > 0 %}
+      <div class="alert alert-danger" role="alert">
+        <p class="alert-text">
+          {{ exploitedCount }} {{ 'known flaw(s) in your shop are being exploited in the wild. Patch them first.'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}
+        </p>
+      </div>
+    {% endif %}
+
+    {% if last is not null and last.problems is not empty %}
+      <div class="alert alert-warning" role="alert">
+        <div class="alert-text">
+          <p>{{ 'Part of the check did not run, so "no findings" does not mean "clean":'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}</p>
+          <ul>{% for problem in last.problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if last is not null and last.notes is not empty %}
+      <div class="alert alert-info" role="alert">
+        <div class="alert-text">
+          <p>{{ 'Advisories for modules you have, whose affected versions could not be read automatically. Check them by hand:'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}</p>
+          <ul>{% for note in last.notes %}<li>{{ note }}</li>{% endfor %}</ul>
+        </div>
+      </div>
+    {% endif %}
+
+    <form method="post" action="{{ checkUrl }}" class="mb-3">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token(csrfName) }}">
+      <button type="submit" class="btn btn-primary">{{ 'Check now'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}</button>
+      <small class="text-muted ml-2">
+        {% if last is not null %}
+          {{ 'Last check'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}: {{ last.at }} UTC
+        {% else %}
+          {{ 'No check has run yet.'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}
+        {% endif %}
+      </small>
+    </form>
+
+    {% if findings is empty %}
+      <p class="text-muted">{{ 'No known vulnerabilities in what was checked.'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}</p>
+    {% else %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{{ 'Module'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}</th>
+            <th>{{ 'Installed'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}</th>
+            <th>{{ 'Advisory'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}</th>
+            <th>{{ 'Severity'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}</th>
+            <th>{{ 'Fixed in'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for finding in findings %}
+          <tr{% if finding.exploited %} class="table-danger"{% endif %}>
+            <td><code>{{ finding.package }}</code></td>
+            <td>{{ finding.installed }}</td>
+            <td>
+              {% if finding.exploited %}<span class="badge badge-danger">{{ 'Exploited: patch now'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}</span><br>{% endif %}
+              {% if finding.link and finding.link starts with 'https://' %}<a href="{{ finding.link }}" target="_blank" rel="noopener noreferrer">{{ finding.title }}</a>{% else %}{{ finding.title }}{% endif %}
+              {% if finding.cve %}<br><small class="text-muted">{{ finding.cve }}</small>{% endif %}
+            </td>
+            <td>{{ finding.severity == 'not_rated' ? 'Not rated' : finding.severity|capitalize }}</td>
+            <td>{% if finding.fixed_in %}{{ finding.fixed_in starts with '>' ? ('Later than ' ~ finding.fixed_in|slice(1)) : finding.fixed_in }}{% else %}<span class="text-muted">&ndash;</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    <p class="text-muted mt-3">
+      {{ 'Cron URL'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}: <code>{{ cronUrl }}</code><br>
+      <a href="{{ configUrl }}">{{ 'Settings'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}</a>
+    </p>
+  </div>
+</div>
+{% endblock %}
