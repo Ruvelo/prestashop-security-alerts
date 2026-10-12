@@ -118,7 +118,7 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ruvelo_securityalerts-zip
           path: dist
