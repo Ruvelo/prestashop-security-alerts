@@ -7,6 +7,7 @@ namespace Ruvelo\PrestaShop\SecurityAlerts\Controller\Admin;
 use Ruvelo\PrestaShop\SecurityAlerts\PrestaShop\ConfigurationSettings;
 use Ruvelo\PrestaShop\SecurityAlerts\PrestaShop\DbStorage;
 use Ruvelo\PrestaShop\SecurityAlerts\PrestaShop\ServiceFactory;
+use Ruvelo\PrestaShop\SecurityAlerts\SourceLabel;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -33,6 +34,8 @@ final class AlertsController extends BaseController
             'findings' => array_map(static fn ($f): array => $f->toArray(), $findings),
             'exploitedCount' => \count(array_filter($findings, static fn ($f): bool => $f->isExploited())),
             'last' => $last,
+            'sourceLabel' => SourceLabel::of(\is_array($last) && \is_string($last['source'] ?? null) ? $last['source'] : ConfigurationSettings::source()),
+            'sourceKnown' => \is_array($last) && \is_string($last['source'] ?? null),
             'checkUrl' => $this->generateUrl('ruvelo_securityalerts_check'),
             'cronUrl' => \Context::getContext()->link->getModuleLink('ruvelo_securityalerts', 'cron', ['token' => ConfigurationSettings::token()]),
             'configUrl' => \Context::getContext()->link->getAdminLink('AdminModules', true, [], ['configure' => 'ruvelo_securityalerts']),
@@ -57,7 +60,7 @@ final class AlertsController extends BaseController
                 $outcome->report->packageCount(),
                 \count($outcome->report->findings),
                 \count($outcome->report->exploited()),
-            ));
+            ) . ' Advisory source: ' . SourceLabel::of($outcome->report->source) . '.');
             foreach ($outcome->report->problems as $problem) {
                 $this->addFlash('warning', $problem);
             }

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Ruvelo\PrestaShop\SecurityAlerts;
 
 use Ruvelo\SecurityAdvisories\Finding;
+use Ruvelo\SecurityAdvisories\Note;
 use Ruvelo\SecurityAdvisories\Reconciler;
+use Ruvelo\SecurityAdvisories\Report;
 use Ruvelo\SecurityAdvisories\Severity;
 
 /**
@@ -28,24 +30,45 @@ final class Checker
      */
     public function run(bool $dryRun = false, bool $fresh = false): CheckOutcome
     {
-        ['report' => $report, 'notes' => $notes] = $this->checkup->run($fresh);
-        $changes = $this->reconciler->reconcile($this->storage->known(), $report);
+        $report = $this->checkup->run($fresh);
+        $known = $this->storage->known();
+        $lastSeen = $this->storage->lastSeen();
+
+        // The core decides what is news, whichever source named the advisory this time.
+        $changes = $this->reconciler->reconcile($known, $report, $lastSeen);
 
         if ($dryRun) {
-            return new CheckOutcome($report, $changes, 0, $notes, true);
+            return new CheckOutcome($report, $changes, 0, true);
         }
 
-        $this->storage->apply($report, $changes);
+        $next = $this->reconciler->next($known, $report, [], $lastSeen);
+        $this->storage->apply($report, $changes, $next, $this->reconciler->lastSeen($lastSeen, $report, $next));
         $this->storage->saveLastCheck([
             'at' => gmdate('Y-m-d H:i:s'),
             'packages' => $report->packages,
             'problems' => $report->problems,
-            'notes' => $notes,
+            'notes' => self::noteLines($report),
+            'source' => $report->source,
+            'sources' => $report->sources,
             'kev_checked' => $report->kevChecked,
             'counts' => $report->counts(),
         ]);
 
-        return new CheckOutcome($report, $changes, $this->settings->isEnabled() ? $this->notify() : 0, $notes);
+        return new CheckOutcome($report, $changes, $this->settings->isEnabled() ? $this->notify() : 0);
+    }
+
+    /**
+     * The report's notes as the plain lines the page, the console and the JSON show
+     * ("module: advisory title"), the shape 1.0 stored.
+     *
+     * @return list<string>
+     */
+    public static function noteLines(Report $report): array
+    {
+        return array_map(
+            static fn (Note $note): string => ($note->package !== null ? $note->package . ': ' : '') . $note->message,
+            $report->notes,
+        );
     }
 
     /**
@@ -72,7 +95,7 @@ final class Checker
             return 0;
         }
 
-        $this->storage->markNotified(array_map(static fn (Finding $f): string => $f->key(), $pending));
+        $this->storage->markNotified(array_keys($pending));
 
         return $recipients === [] ? 0 : \count($worthIt);
     }

@@ -6,7 +6,6 @@ namespace Ruvelo\PrestaShop\SecurityAlerts\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Ruvelo\PrestaShop\SecurityAlerts\Cache\FileCache;
-use Ruvelo\PrestaShop\SecurityAlerts\FindingCodec;
 use Ruvelo\PrestaShop\SecurityAlerts\Mail\MessageBuilder;
 use Ruvelo\PrestaShop\SecurityAlerts\PrestaShop\ConfigurationSettings;
 use Ruvelo\SecurityAdvisories\Ecosystem;
@@ -26,12 +25,12 @@ final class SmallPartsTest extends TestCase
     {
         foreach ([true, false] as $exploited) {
             $finding = $this->finding($exploited);
-            $back = FindingCodec::decode(json_decode((string) json_encode($finding->toArray()), true));
+            $back = Finding::fromArray(json_decode((string) json_encode($finding->toArray()), true));
 
             self::assertNotNull($back);
             self::assertSame($finding->toArray(), $back->toArray());
         }
-        self::assertNull(FindingCodec::decode(['ecosystem' => 'nope']));
+        self::assertNull(Finding::fromArray(['ecosystem' => 'nope']));
     }
 
     public function testEmailEscapesEverythingAndPutsTheBadgeOnExploited(): void

@@ -37,7 +37,7 @@ final class FriendsOfPrestaSourceTest extends TestCase
         $this->client = new MockClient($bodies);
         $factory = new Psr17Factory();
 
-        return new FriendsOfPrestaSource(new JsonClient($this->client, $factory, $factory, tries: 1), $this->client, $factory, new ResponseCache($cache));
+        return new FriendsOfPrestaSource(new JsonClient($this->client, $factory, $factory, tries: 1), new ResponseCache($cache));
     }
 
     private static function module(string $name, string $version): InstalledPackage
@@ -101,8 +101,12 @@ final class FriendsOfPrestaSourceTest extends TestCase
         $matches = $source->find([self::module('ps_checkout', '4.0.0')]);
 
         self::assertSame([], $matches);
-        self::assertCount(1, $source->unreadable());
-        self::assertStringStartsWith('ps_checkout: ', $source->unreadable()[0]);
+        self::assertCount(1, $source->notes());
+        $note = $source->notes()[0];
+        self::assertSame('ps_checkout', $note->package);
+        self::assertSame(Ecosystem::Extension, $note->ecosystem);
+        self::assertStringStartsWith('https://security.friendsofpresta.org/', (string) $note->link);
+        self::assertNotSame('', $note->message);
     }
 
     public function testFetchesEachAdvisoryOnceThenReadsTheCache(): void

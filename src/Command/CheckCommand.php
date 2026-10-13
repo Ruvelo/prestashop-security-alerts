@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Ruvelo\PrestaShop\SecurityAlerts\Command;
 
+use Ruvelo\PrestaShop\SecurityAlerts\Checker;
 use Ruvelo\PrestaShop\SecurityAlerts\PrestaShop\ServiceFactory;
+use Ruvelo\PrestaShop\SecurityAlerts\SourceLabel;
 use Ruvelo\SecurityAdvisories\Exceptions\InvalidThreshold;
 use Ruvelo\SecurityAdvisories\Threshold;
 use Symfony\Component\Console\Command\Command;
@@ -46,9 +48,9 @@ final class CheckCommand extends Command
         $report = $outcome->report;
 
         if ($input->getOption('json')) {
-            $output->writeln((string) json_encode($report->toArray() + ['notes' => $outcome->notes], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            $output->writeln((string) json_encode(array_merge($report->toArray(), ['notes' => Checker::noteLines($report)]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         } else {
-            $output->writeln(sprintf('%d packages checked, %d findings, %d exploited.', $report->packageCount(), \count($report->findings), \count($report->exploited())));
+            $output->writeln(sprintf('%d packages checked, %d findings, %d exploited. Advisory source: %s.', $report->packageCount(), \count($report->findings), \count($report->exploited()), SourceLabel::of($report->source)));
             foreach ($report->findings as $finding) {
                 $output->writeln(sprintf(
                     '%s %s %s: %s%s',
@@ -62,7 +64,7 @@ final class CheckCommand extends Command
             foreach ($report->problems as $problem) {
                 $output->writeln('<comment>' . $problem . '</comment>');
             }
-            foreach ($outcome->notes as $note) {
+            foreach (Checker::noteLines($report) as $note) {
                 $output->writeln('<comment>Not checked, affected versions unreadable: ' . $note . '</comment>');
             }
             if ($outcome->emailed > 0) {

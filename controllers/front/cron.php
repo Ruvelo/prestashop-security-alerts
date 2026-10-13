@@ -44,6 +44,7 @@ class Ruvelo_SecurityAlertsCronModuleFrontController extends ModuleFrontControll
                 'exploited' => count($outcome->report->exploited()),
                 'emailed' => $outcome->emailed,
                 'problems' => count($outcome->report->problems),
+                'source' => $outcome->report->source,
             ]);
         } catch (Throwable $e) {
             http_response_code(500);

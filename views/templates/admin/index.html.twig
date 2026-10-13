@@ -43,6 +43,9 @@
         {% else %}
           {{ 'No check has run yet.'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}
         {% endif %}
+        {% if sourceKnown %}
+          &middot; {{ 'Advisory source'|trans({}, 'Modules.Ruvelosecurityalerts.Admin') }}: {{ sourceLabel }}
+        {% endif %}
       </small>
     </form>
 

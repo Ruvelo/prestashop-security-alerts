@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Ruvelo\PrestaShop\SecurityAlerts\PrestaShop;
 
-use Ruvelo\PrestaShop\SecurityAlerts\FindingCodec;
 use Ruvelo\PrestaShop\SecurityAlerts\Storage;
 use Ruvelo\SecurityAdvisories\Changes;
 use Ruvelo\SecurityAdvisories\Finding;
@@ -27,23 +26,45 @@ final class DbStorage implements Storage
         return $known;
     }
 
-    public function apply(Report $report, Changes $changes): void
+    public function lastSeen(): array
+    {
+        $seen = [];
+        foreach ($this->rows('SELECT finding_key, data FROM `' . $this->table() . '`') as $row) {
+            $data = json_decode((string) $row['data'], true);
+            if (\is_array($data)) {
+                $seen[(string) $row['finding_key']] = $data;
+            }
+        }
+
+        return $seen;
+    }
+
+    public function apply(Report $report, Changes $changes, array $next, array $seen): void
     {
         $db = \Db::getInstance();
+        $current = [];
+        foreach ($report->findings as $finding) {
+            $current[$finding->key()] = $finding;
+        }
         $flipped = array_fill_keys(array_map(static fn (Finding $f): string => $f->key(), $changes->exploited), true);
         $known = $this->known();
 
-        foreach ($report->findings as $finding) {
-            $key = $finding->key();
+        // Each stored key keeps naming its row, even when another source's id wins this time.
+        foreach ($next as $key => $exploited) {
+            $finding = $current[(string) ($seen[$key]['key'] ?? '')] ?? null;
+
+            if ($finding === null) {
+                continue; // not vouched for this time: left as it was
+            }
+
             $data = json_encode($finding->toArray(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            $exploited = $finding->isExploited() || ($known[$key] ?? false);
 
             if (\array_key_exists($key, $known)) {
                 // A finding stays "exploited" once it was: if CISA's feed was down this time, keep the stored details.
                 $fields = ($known[$key] && !$finding->isExploited()) ? [] : ['data' => pSQL((string) $data, true)];
                 $db->update(self::TABLE, $fields + [
                     'exploited' => (int) $exploited,
-                ] + (isset($flipped[$key]) ? ['notified' => 0] : []), "finding_key = '" . pSQL($key) . "'");
+                ] + (isset($flipped[$finding->key()]) ? ['notified' => 0] : []), "finding_key = '" . pSQL($key) . "'");
             } else {
                 $db->insert(self::TABLE, [
                     'finding_key' => pSQL($key),
@@ -55,14 +76,17 @@ final class DbStorage implements Storage
             }
         }
 
-        foreach ($changes->resolved as $key) {
-            $db->delete(self::TABLE, "finding_key = '" . pSQL($key) . "'");
+        // Resolved, or collapsed into another row for the same vulnerability.
+        foreach (array_keys($known) as $key) {
+            if (!\array_key_exists($key, $next)) {
+                $db->delete(self::TABLE, "finding_key = '" . pSQL($key) . "'");
+            }
         }
     }
 
     public function pending(): array
     {
-        return $this->decode($this->rows('SELECT data, exploited FROM `' . $this->table() . '` WHERE notified = 0'));
+        return $this->decode($this->rows('SELECT finding_key, data FROM `' . $this->table() . '` WHERE notified = 0'));
     }
 
     public function markNotified(array $keys): void
@@ -74,7 +98,7 @@ final class DbStorage implements Storage
 
     public function all(): array
     {
-        return $this->decode($this->rows('SELECT data, exploited FROM `' . $this->table() . '`'));
+        return array_values($this->decode($this->rows('SELECT finding_key, data FROM `' . $this->table() . '`')));
     }
 
     public function lastCheck(): ?array
@@ -103,20 +127,19 @@ final class DbStorage implements Storage
     /**
      * @param list<array<string, mixed>> $rows
      *
-     * @return list<Finding>
+     * @return array<string, Finding> By stored key, worst first
      */
     private function decode(array $rows): array
     {
         $findings = [];
         foreach ($rows as $row) {
             $data = json_decode((string) $row['data'], true);
-            $finding = \is_array($data) ? FindingCodec::decode($data) : null;
-            if ($finding === null) {
-                continue;
+            $finding = \is_array($data) ? Finding::fromArray($data) : null;
+            if ($finding !== null) {
+                $findings[(string) $row['finding_key']] = $finding;
             }
-            $findings[] = $finding;
         }
-        usort($findings, Finding::compare(...));
+        uasort($findings, Finding::compare(...));
 
         return $findings;
     }

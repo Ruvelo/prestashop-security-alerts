@@ -11,13 +11,12 @@ use Ruvelo\PrestaShop\SecurityAlerts\Checkup;
 use Ruvelo\PrestaShop\SecurityAlerts\Dedupe;
 use Ruvelo\PrestaShop\SecurityAlerts\Modules\ModuleInfo;
 use Ruvelo\PrestaShop\SecurityAlerts\Modules\PackageLists;
-use Ruvelo\PrestaShop\SecurityAlerts\Notifier;
-use Ruvelo\PrestaShop\SecurityAlerts\Settings;
 use Ruvelo\PrestaShop\SecurityAlerts\Sources\FriendsOfPrestaSource;
-use Ruvelo\PrestaShop\SecurityAlerts\Storage;
+use Ruvelo\PrestaShop\SecurityAlerts\Tests\Support\FakeNotifier;
+use Ruvelo\PrestaShop\SecurityAlerts\Tests\Support\FakeSettings;
+use Ruvelo\PrestaShop\SecurityAlerts\Tests\Support\FakeStorage;
 use Ruvelo\PrestaShop\SecurityAlerts\Tests\Support\MockClient;
 use Ruvelo\SecurityAdvisories\Cache\ResponseCache;
-use Ruvelo\SecurityAdvisories\Changes;
 use Ruvelo\SecurityAdvisories\Ecosystem;
 use Ruvelo\SecurityAdvisories\Finding;
 use Ruvelo\SecurityAdvisories\Http\JsonClient;
@@ -53,7 +52,7 @@ final class CheckerTest extends TestCase
         $factory = new Psr17Factory();
         $json = new JsonClient($client, $factory, $factory, tries: 1);
         $cache = new ResponseCache();
-        $friends = new FriendsOfPrestaSource($json, $client, $factory, $cache);
+        $friends = new FriendsOfPrestaSource($json, $cache);
         $scanner = new Scanner(
             PackageLists::build('8.1.7', [new ModuleInfo('advancedpopupcreator', '1.2.0', 'Idnovate')]),
             [new PackagistAdvisorySource($json, $cache), $friends],
@@ -62,7 +61,7 @@ final class CheckerTest extends TestCase
         $notifier = new FakeNotifier();
         $settings ??= new FakeSettings();
 
-        return [new Checker(new Checkup($scanner, $friends), $storage, $settings, $notifier), $storage, $notifier, $settings];
+        return [new Checker(new Checkup($scanner), $storage, $settings, $notifier), $storage, $notifier, $settings];
     }
 
     public function testFindsStoresAndEmailsAnExploitedFindingFirst(): void
@@ -137,7 +136,7 @@ final class CheckerTest extends TestCase
 
         $settings = new FakeSettings(minimum: Severity::Critical);
         $storage = new FakeStorage();
-        $storage->rows['k'] = ['finding' => $this->finding('m', 'A', Severity::High), 'exploited' => false, 'notified' => false];
+        $storage->seed($this->finding('m', 'A', Severity::High)->toArray(), false, false);
         $notifier = new FakeNotifier();
         $checkup = $this->emptyCheckup();
         (new Checker($checkup, $storage, $settings, $notifier))->run();
@@ -187,108 +186,8 @@ final class CheckerTest extends TestCase
         $client = new MockClient(['search.json' => '[{"url":"/x/2026/01/01/none.html","tags":"none"}]']);
         $factory = new Psr17Factory();
         $json = new JsonClient($client, $factory, $factory, tries: 1);
-        $friends = new FriendsOfPrestaSource($json, $client, $factory, new ResponseCache());
+        $friends = new FriendsOfPrestaSource($json, new ResponseCache());
 
-        return new Checkup(new Scanner([], [$friends]), $friends);
-    }
-}
-
-final class FakeSettings implements Settings
-{
-    /**
-     * @param list<string> $recipients
-     */
-    public function __construct(
-        private readonly bool $enabled = true,
-        private readonly array $recipients = ['owner@example.test'],
-        private readonly Severity $minimum = Severity::Medium,
-    ) {
-    }
-
-    public function isEnabled(): bool
-    {
-        return $this->enabled;
-    }
-
-    public function recipients(): array
-    {
-        return $this->recipients;
-    }
-
-    public function minimumSeverity(): Severity
-    {
-        return $this->minimum;
-    }
-}
-
-final class FakeNotifier implements Notifier
-{
-    /** @var list<list<Finding>> */
-    public array $sent = [];
-    public bool $ok = true;
-
-    public function send(array $recipients, array $findings): bool
-    {
-        if ($this->ok) {
-            $this->sent[] = $findings;
-        }
-
-        return $this->ok;
-    }
-}
-
-final class FakeStorage implements Storage
-{
-    /** @var array<string, array{finding: Finding, exploited: bool, notified: bool}> */
-    public array $rows = [];
-    /** @var array<string, mixed>|null */
-    public ?array $meta = null;
-
-    public function known(): array
-    {
-        return array_map(static fn (array $r): bool => $r['exploited'], $this->rows);
-    }
-
-    public function apply(Report $report, Changes $changes): void
-    {
-        $flipped = array_map(static fn (Finding $f): string => $f->key(), $changes->exploited);
-        foreach ($report->findings as $f) {
-            $old = $this->rows[$f->key()] ?? null;
-            $this->rows[$f->key()] = [
-                'finding' => $f,
-                'exploited' => $f->isExploited() || ($old['exploited'] ?? false),
-                'notified' => $old !== null && !\in_array($f->key(), $flipped, true) && $old['notified'],
-            ];
-        }
-        foreach ($changes->resolved as $key) {
-            unset($this->rows[$key]);
-        }
-    }
-
-    public function pending(): array
-    {
-        return array_values(array_map(static fn (array $r): Finding => $r['finding'], array_filter($this->rows, static fn (array $r): bool => !$r['notified'])));
-    }
-
-    public function markNotified(array $keys): void
-    {
-        foreach ($keys as $key) {
-            $this->rows[$key]['notified'] = true;
-        }
-    }
-
-    public function all(): array
-    {
-        return array_values(array_map(static fn (array $r): Finding => $r['finding'], $this->rows));
-    }
-
-    public function lastCheck(): ?array
-    {
-        return $this->meta;
-    }
-
-    public function saveLastCheck(array $meta): void
-    {
-        $this->meta = $meta;
+        return new Checkup(new Scanner([], [$friends]));
     }
 }

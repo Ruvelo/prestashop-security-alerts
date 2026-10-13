@@ -29,6 +29,6 @@ final class Dedupe
             static fn (Finding $f): bool => !($f->ecosystem === Ecosystem::Extension && $f->cve !== null && isset($viaPackagist[$f->package . '|' . $f->cve])),
         ));
 
-        return new Report($kept, $report->packages, $report->checked, $report->problems, $report->kevChecked, $report->checkedAt);
+        return new Report($kept, $report->packages, $report->checked, $report->problems, $report->kevChecked, $report->checkedAt, $report->sources, $report->unchecked, $report->notes);
     }
 }

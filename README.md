@@ -11,7 +11,7 @@ Module name: `ruvelo_securityalerts`. It is the PrestaShop adapter for [`ruvelo/
 Download `ruvelo_securityalerts-<version>.zip` from the [releases](https://github.com/Ruvelo/prestashop-security-alerts/releases) (it contains the module and its `vendor/`), then either upload it under Module Manager, or:
 
 ```bash
-unzip ruvelo_securityalerts-1.0.0.zip -d modules/
+unzip ruvelo_securityalerts-1.1.0.zip -d modules/
 bin/console prestashop:module install ruvelo_securityalerts
 bin/console cache:clear
 bin/console ruvelo:security-alerts:check
@@ -19,7 +19,7 @@ bin/console ruvelo:security-alerts:check
 
 The cache clear matters once: it is when PrestaShop learns about the module's console command.
 
-Requirements: PrestaShop 8.1 or later (8.1.7, 8.2.8, 9.0.3 and 9.2.0 are each installed and tested in CI), **PHP 8.2 or later** (the core library uses PHP 8.2 features, so a shop still on PHP 7.4 to 8.1 can't run it; PrestaShop 8.1 officially lists PHP up to 8.1, so on 8.1 you are running a PHP version PrestaShop doesn't certify, which CI does exercise), the `curl` PHP extension, and outbound HTTPS to `packagist.org`, `security.friendsofpresta.org`, `raw.githubusercontent.com` and `www.cisa.gov`.
+Requirements: PrestaShop 8.1 or later (8.1.7, 8.2.8, 9.0.3 and 9.2.0 are each installed and tested in CI), **PHP 8.2 or later** (the core library uses PHP 8.2 features, so a shop still on PHP 7.4 to 8.1 can't run it; PrestaShop 8.1 officially lists PHP up to 8.1, so on 8.1 you are running a PHP version PrestaShop doesn't certify, which CI does exercise), the `curl` PHP extension, and outbound HTTPS to `valtry.co.uk` (optional, see below), `packagist.org`, `security.friendsofpresta.org`, `raw.githubusercontent.com` and `www.cisa.gov`.
 
 ## What it checks, and what it can't
 
@@ -27,12 +27,12 @@ This is the part to read before you rely on it.
 
 | What | Source | How it is matched | Reliability |
 |---|---|---|---|
-| PrestaShop core (`_PS_VERSION_`) | [Packagist security advisories](https://packagist.org/apidoc#list-security-advisories) for `prestashop/prestashop` (GitHub Advisory Database) | Exact version ranges | High |
-| Modules PrestaShop SA ships: `ps_*` and modules whose author is "PrestaShop" | Packagist, as `prestashop/<technical name>` (for example `prestashop/ps_facetedsearch`, `prestashop/blockwishlist`) | Exact version ranges | High, but only for the ones with a published GitHub advisory |
+| PrestaShop core (`_PS_VERSION_`) | [Valtry's Advisory API](https://valtry.co.uk/docs/api/advisories) first, then [Packagist security advisories](https://packagist.org/apidoc#list-security-advisories) if Valtry can't answer, for `prestashop/prestashop` (GitHub Advisory Database). Both serve the same data | Exact version ranges | High |
+| Modules PrestaShop SA ships: `ps_*` and modules whose author is "PrestaShop" | The same two, as `prestashop/<technical name>` (for example `prestashop/ps_facetedsearch`, `prestashop/blockwishlist`) | Exact version ranges | High, but only for the ones with a published GitHub advisory |
 | Third-party modules (every module, in fact) | The [Friends of Presta](https://security.friendsofpresta.org) advisories (their search index, then the text of each advisory that names one of your modules) | By module technical name, and the versions written in the advisory's "Impacted release" line | Medium, see below |
-| "Is it being exploited?" | [CISA Known Exploited Vulnerabilities](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | By CVE | High, but short: few PrestaShop CVEs are on it |
+| "Is it being exploited?" | [CISA Known Exploited Vulnerabilities](https://www.cisa.gov/known-exploited-vulnerabilities-catalog); Valtry's answers carry the verdict already | By CVE | High, but short: few PrestaShop CVEs are on it |
 
-**Third-party modules are the weak part, and this is why.** There is no Composer-style advisory database for third-party PrestaShop modules: Friends of Presta publish advisories as web pages (about 230 of them), not as a machine-readable feed with version ranges. The only structured part is a search index with titles and tags, and the tags usually (not always) contain the module's technical name. The affected versions are free text that people wrote: `<= 4.0.1 (4.0.2 fixed the vulnerability)`, `All versions`, `>= 1.3.0, < 4.4.1, < 5.0.5 (see details below)`. The module reads the ones it can read with certainty. Of the 222 advisories that had an "Impacted release" line when this was written, it reads 195 (186 ranges, 9 "all versions") and refuses 27, such as a lower bound followed by two upper bounds, several PrestaShop lines in prose, or versions like `7.8.a`. It never guesses: **an advisory that names a module you have but whose versions can't be read is listed on the page as "check by hand"** and is not counted as a finding.
+**Third-party modules are the weak part, and this is why.** There is no Composer-style advisory database for third-party PrestaShop modules: Friends of Presta publish advisories as web pages (about 230 of them), not as a machine-readable feed with version ranges. The only structured part is a search index with titles and tags, and the tags usually (not always) contain the module's technical name. The affected versions are free text that people wrote: `<= 4.0.1 (4.0.2 fixed the vulnerability)`, `All versions`, `>= 1.3.0, < 4.4.1, < 5.0.5 (see details below)`. The module reads the ones it can read with certainty. Of the 222 advisories that had an "Impacted release" line when this was written, it reads 195 (186 ranges, 9 "all versions") and refuses 27, such as a lower bound followed by two upper bounds, several PrestaShop lines in prose, or versions like `7.8.a`. It never guesses: **an advisory that names a module you have but whose versions can't be read is listed on the page as "check by hand"** (a note on the report) and is not counted as a finding.
 
 What that means for you:
 
@@ -63,7 +63,7 @@ What that means for you:
 - **A fix version** when the advisory gives one.
 - **Cron and CLI.** A secure cron URL for shared hosting, and `bin/console ruvelo:security-alerts:check` for pipelines.
 - **Admin only.** Nothing is added to the storefront, so any theme is the same to it. No JavaScript on your pages.
-- **Free sources, no keys.** And a handful of HTTPS requests a day.
+- **Free sources, no keys.** And a handful of HTTPS requests a day. The page, the console and the JSON say which source answered.
 
 Watching many shops? [Valtry](https://valtry.co.uk/?utm_source=ruvelo&utm_medium=github&utm_campaign=prestashop-security-alerts) checks every site from the outside, daily.
 
@@ -71,12 +71,17 @@ Watching many shops? [Valtry](https://valtry.co.uk/?utm_source=ruvelo&utm_medium
 
 | Request | Sent | Why |
 |---|---|---|
-| `POST https://packagist.org/api/security-advisories/` | the names `prestashop/prestashop` and `prestashop/<name>` for the modules PrestaShop ships. Versions are matched here. | advisories for PrestaShop and its own modules |
+| `POST https://valtry.co.uk/api/advisories/v1/query` (default) | **the package names only**: `prestashop/prestashop` and `prestashop/<name>` for the modules PrestaShop ships, and a random nonce. **Versions never leave your server**: they are matched here. Third-party module names are not sent. | signed advisories, with the CISA verdict, for PrestaShop and its own modules |
+| `POST https://packagist.org/api/security-advisories/` (only if Valtry can't answer, or you opted out) | the same names. Versions are matched here. | the same advisories |
 | `GET https://security.friendsofpresta.org/search.json` | nothing | the index of advisories |
 | `GET https://raw.githubusercontent.com/friends-of-presta/security-advisories/main/_posts/<advisory>.md` | nothing but the request itself; only for advisories whose tags name a module you have | the affected versions |
-| `GET https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json` | nothing | which CVEs are exploited |
+| `GET https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json` (only if Valtry can't answer, or you opted out) | nothing | which CVEs are exploited |
 
-Honest note on the third row: asking for an advisory's page tells GitHub that your server is interested in that advisory, which hints that you have that module. Your shop's address, module list, versions, customers and employees are never sent. No account, no key. Responses are cached under `var/cache` (advisories one hour, an advisory's text one week, the CISA list six hours).
+**Valtry is the default source for PrestaShop and its own modules.** Since 1.1 the check asks [Valtry's Advisory API](https://valtry.co.uk/docs/api/advisories) first: one request instead of two, and the CISA verdict comes with it. Every answer is signed (Ed25519) and verified against public keys pinned in the module, never against a key it downloads; the answer must also echo the request's nonce and cover every name asked about, so a hijacked DNS record, a TLS-intercepting proxy or a replayed answer is refused. Valtry doesn't log or store the names it is sent. If Valtry can't be reached within 5 seconds, answers with an error, sends an answer that doesn't verify, or says its data is stale, the module asks Packagist and CISA directly, automatically, and the check completes either way. After a failure Valtry is left alone for five minutes. Both paths give the same findings.
+
+**To never contact Valtry**, set Modules > Security alerts > Configure > Advisory source to "Public feeds only". Setting `RUVELO_ADVISORIES_SOURCE=public` in the server's environment does the same and wins over the setting, so a hosting owner can opt out without touching the shop.
+
+Honest note on the fourth row: asking for an advisory's page tells GitHub that your server is interested in that advisory, which hints that you have that module. Your shop's address, module list, versions, customers and employees are never sent. No account, no key. Responses are cached under `var/cache` (advisories one hour, an advisory's text one week, the CISA list six hours).
 
 It does not install, change or update anything, and writes only to its own table and to `var/cache`.
 
@@ -89,6 +94,7 @@ Modules > Security alerts > Configure.
 | Scheduled check and emails | Yes | Turns off the cron URL and the emails. "Check now" and the console command still work |
 | Notification emails | empty | Comma-separated. Empty means no email: findings are still listed on the page |
 | Minimum severity to email | Medium | Exploited findings are always emailed. A finding with no rating counts as High |
+| Advisory source | Valtry, with the public feeds as fallback | "Public feeds only" never contacts Valtry (see above). `RUVELO_ADVISORIES_SOURCE=public` in the environment overrides it |
 
 ### Cron
 
@@ -98,7 +104,7 @@ The settings page shows a secret URL; call it once a day:
 17 3 * * * curl -fsS "https://your-shop.example/index.php?fc=module&module=ruvelo_securityalerts&controller=cron&token=..."
 ```
 
-It answers `{"ok":true,"findings":2,"exploited":0,"emailed":0,"problems":0}`, or `403` for a wrong token. The token is generated at install; to change it, delete the `RUVELO_SA_CRON_TOKEN` configuration row and open the settings page.
+It answers `{"ok":true,"findings":2,"exploited":0,"emailed":0,"problems":0,"source":"valtry"}`, or `403` for a wrong token. The token is generated at install; to change it, delete the `RUVELO_SA_CRON_TOKEN` configuration row and open the settings page.
 
 ## Command line
 
@@ -109,12 +115,12 @@ bin/console ruvelo:security-alerts:check [--json] [--fail-on=exploited|critical|
 | Option | What it does |
 |---|---|
 | *(none)* | Check, store what changed, email what is new, print the findings |
-| `--json` | Print the report as JSON |
+| `--json` | Print the report as JSON (including `source`: `valtry`, `public` or `mixed`) |
 | `--fail-on=…` | Exit with code `1` if a finding is at least that bad (`exploited` means only the exploited ones) |
 | `--dry-run` | Only report: nothing stored, no email |
 | `--fresh` | Skip the response cache |
 
-Exit codes: `0` fine, `1` a finding met `--fail-on`, `2` a source could not be read in full (a "no findings" that isn't "clean") or an option is wrong. For a deploy pipeline:
+Exit codes: `0` fine, `1` a finding met `--fail-on`, `2` a source could not be read in full (a "no findings" that isn't "clean") or an option is wrong. The summary line names the advisory source. For a deploy pipeline:
 
 ```bash
 bin/console ruvelo:security-alerts:check --dry-run --json --fail-on=exploited > alerts.json
@@ -122,7 +128,7 @@ bin/console ruvelo:security-alerts:check --dry-run --json --fail-on=exploited > 
 
 ## Development
 
-`composer check` runs the PrestaShop coding standard, PHPStan level 6 (against small PrestaShop stubs, so no shop is needed) and the unit tests, exactly as CI does. The unit tests never touch the network: a mock PSR-18 client serves real recorded Friends of Presta pages. CI also installs real PrestaShops and the release zip. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [changelog](CHANGELOG.md).
+`composer check` runs the PrestaShop coding standard, PHPStan level 6 (against small PrestaShop stubs, so no shop is needed) and the unit tests, exactly as CI does. The unit tests never touch the network: a mock PSR-18 client serves real recorded Friends of Presta pages, and a fake Valtry signs its answers with a key made for the test. CI also installs real PrestaShops and the release zip. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [changelog](CHANGELOG.md).
 
 `bin/build-zip.sh` builds the installable zip, with its own `vendor/`. Until `ruvelo/security-advisories` is on Packagist, `composer.json` points at its GitHub repository.
 
@@ -130,7 +136,7 @@ bin/console ruvelo:security-alerts:check --dry-run --json --fail-on=exploited > 
 
 Built by [François Bultez](https://github.com/francoisbultez) at [Valtry](https://valtry.co.uk/?utm_source=ruvelo&utm_medium=github&utm_campaign=prestashop-security-alerts), the website security scanner, and everyone who [contributes](https://github.com/Ruvelo/prestashop-security-alerts/graphs/contributors).
 
-Advisories come from the [Friends of Presta security team](https://security.friendsofpresta.org) (their advisories are CC BY-SA 4.0), [Packagist](https://packagist.org) and, through it, the [GitHub Advisory Database](https://github.com/advisories), and [CISA](https://www.cisa.gov/known-exploited-vulnerabilities-catalog). Thanks to everyone who maintains them.
+Advisories come from [Valtry](https://valtry.co.uk/docs/api/advisories), the [Friends of Presta security team](https://security.friendsofpresta.org) (their advisories are CC BY-SA 4.0), [Packagist](https://packagist.org) and, through it, the [GitHub Advisory Database](https://github.com/advisories), and [CISA](https://www.cisa.gov/known-exploited-vulnerabilities-catalog). Thanks to everyone who maintains them.
 
 ## License
 

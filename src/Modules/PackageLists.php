@@ -35,10 +35,12 @@ final class PackageLists
                 continue;
             }
 
-            $extensions[] = new InstalledPackage(Ecosystem::Extension, $module->name, $module->version);
+            // What the shop knows about the module rides along on every finding for it.
+            $metadata = ['installed' => $module->installed, 'active' => $module->active];
+            $extensions[] = new InstalledPackage(Ecosystem::Extension, $module->name, $module->version, false, $metadata);
 
             if ($module->isNative() && preg_match('/^[a-z0-9_]+$/', $module->name) === 1) {
-                $composer[] = new InstalledPackage(Ecosystem::Composer, 'prestashop/' . $module->name, $module->version);
+                $composer[] = new InstalledPackage(Ecosystem::Composer, 'prestashop/' . $module->name, $module->version, false, $metadata);
             }
         }
 

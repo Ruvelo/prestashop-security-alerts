@@ -29,7 +29,7 @@ class Ruvelo_SecurityAlerts extends Module
     {
         $this->name = 'ruvelo_securityalerts';
         $this->tab = 'administration';
-        $this->version = '1.0.0';
+        $this->version = '1.1.0';
         $this->author = 'Ruvelo';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -59,12 +59,13 @@ class Ruvelo_SecurityAlerts extends Module
             && Configuration::updateGlobalValue(ConfigurationSettings::ENABLED, 1)
             && Configuration::updateGlobalValue(ConfigurationSettings::EMAILS, '')
             && Configuration::updateGlobalValue(ConfigurationSettings::MIN_SEVERITY, 'medium')
+            && Configuration::updateGlobalValue(ConfigurationSettings::SOURCE, 'valtry')
             && Configuration::updateGlobalValue(ConfigurationSettings::CRON_TOKEN, bin2hex(random_bytes(16)));
     }
 
     public function uninstall(): bool
     {
-        foreach ([ConfigurationSettings::ENABLED, ConfigurationSettings::EMAILS, ConfigurationSettings::MIN_SEVERITY, ConfigurationSettings::CRON_TOKEN, ConfigurationSettings::LAST_CHECK] as $key) {
+        foreach ([ConfigurationSettings::ENABLED, ConfigurationSettings::EMAILS, ConfigurationSettings::MIN_SEVERITY, ConfigurationSettings::SOURCE, ConfigurationSettings::CRON_TOKEN, ConfigurationSettings::LAST_CHECK] as $key) {
             Configuration::deleteByName($key);
         }
 
@@ -132,6 +133,7 @@ class Ruvelo_SecurityAlerts extends Module
                 Configuration::updateGlobalValue(ConfigurationSettings::ENABLED, (int) Tools::getValue(ConfigurationSettings::ENABLED));
                 Configuration::updateGlobalValue(ConfigurationSettings::EMAILS, implode(', ', $valid));
                 Configuration::updateGlobalValue(ConfigurationSettings::MIN_SEVERITY, ConfigurationSettings::parseSeverity((string) Tools::getValue(ConfigurationSettings::MIN_SEVERITY))->value);
+                Configuration::updateGlobalValue(ConfigurationSettings::SOURCE, ConfigurationSettings::parseSource((string) Tools::getValue(ConfigurationSettings::SOURCE)));
                 $output .= $this->displayConfirmation($this->trans('Settings saved.', [], 'Modules.Ruvelosecurityalerts.Admin'));
             }
         }
@@ -155,6 +157,7 @@ class Ruvelo_SecurityAlerts extends Module
             ConfigurationSettings::ENABLED => (int) Configuration::get(ConfigurationSettings::ENABLED),
             ConfigurationSettings::EMAILS => (string) Configuration::get(ConfigurationSettings::EMAILS),
             ConfigurationSettings::MIN_SEVERITY => (string) Configuration::get(ConfigurationSettings::MIN_SEVERITY),
+            ConfigurationSettings::SOURCE => ConfigurationSettings::source(),
         ];
 
         $t = fn (string $s): string => $this->trans($s, [], 'Modules.Ruvelosecurityalerts.Admin');
@@ -193,6 +196,20 @@ class Ruvelo_SecurityAlerts extends Module
                                 ['id' => 'medium', 'name' => $t('Medium')],
                                 ['id' => 'high', 'name' => $t('High')],
                                 ['id' => 'critical', 'name' => $t('Critical')],
+                            ],
+                            'id' => 'id',
+                            'name' => 'name',
+                        ],
+                    ],
+                    [
+                        'type' => 'select',
+                        'label' => $t('Advisory source'),
+                        'name' => ConfigurationSettings::SOURCE,
+                        'desc' => $t('Where advisories for PrestaShop and its own modules come from. By default the names of those packages (such as prestashop/prestashop and prestashop/ps_checkout) are sent to Valtry\'s Advisory API, which answers with signed advisories. Versions never leave your server: they are matched here. If Valtry cannot answer, the public feeds (Packagist and CISA) are used automatically. Choose "Public feeds only" to never contact Valtry; setting RUVELO_ADVISORIES_SOURCE=public in the server environment does the same. Third-party modules are always checked against the Friends of Presta advisories.'),
+                        'options' => [
+                            'query' => [
+                                ['id' => 'valtry', 'name' => $t('Valtry, with the public feeds as fallback (default)')],
+                                ['id' => 'public', 'name' => $t('Public feeds only (Packagist, CISA)')],
                             ],
                             'id' => 'id',
                             'name' => 'name',

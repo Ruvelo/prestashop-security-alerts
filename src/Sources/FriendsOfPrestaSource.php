@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Ruvelo\PrestaShop\SecurityAlerts\Sources;
 
-use Psr\Http\Client\ClientExceptionInterface;
-use Psr\Http\Client\ClientInterface;
-use Psr\Http\Message\RequestFactoryInterface;
 use Ruvelo\SecurityAdvisories\Advisory;
 use Ruvelo\SecurityAdvisories\AdvisoryMatch;
 use Ruvelo\SecurityAdvisories\Cache\ResponseCache;
@@ -14,8 +11,10 @@ use Ruvelo\SecurityAdvisories\Ecosystem;
 use Ruvelo\SecurityAdvisories\Exceptions\SourceUnavailable;
 use Ruvelo\SecurityAdvisories\Http\JsonClient;
 use Ruvelo\SecurityAdvisories\InstalledPackage;
+use Ruvelo\SecurityAdvisories\Note;
 use Ruvelo\SecurityAdvisories\Severity;
 use Ruvelo\SecurityAdvisories\Sources\AdvisorySource;
+use Ruvelo\SecurityAdvisories\Sources\EmitsNotes;
 use Ruvelo\SecurityAdvisories\Versions;
 
 /**
@@ -28,18 +27,16 @@ use Ruvelo\SecurityAdvisories\Versions;
  * That is the only part of this that reveals anything: which advisory pages are
  * fetched. Module names and versions are matched here, never sent.
  */
-final class FriendsOfPrestaSource implements AdvisorySource
+final class FriendsOfPrestaSource implements AdvisorySource, EmitsNotes
 {
     public const SITE = 'https://security.friendsofpresta.org';
     public const RAW = 'https://raw.githubusercontent.com/friends-of-presta/security-advisories/main/_posts/';
 
-    /** @var list<string> Advisories about an installed module whose affected versions can't be read */
-    private array $unreadable = [];
+    /** @var array<string, Note> Advisories about an installed module whose affected versions can't be read */
+    private array $notes = [];
 
     public function __construct(
         private readonly JsonClient $json,
-        private readonly ClientInterface $http,
-        private readonly RequestFactoryInterface $requests,
         private readonly ResponseCache $cache,
         private readonly string $site = self::SITE,
         private readonly string $raw = self::RAW,
@@ -53,19 +50,19 @@ final class FriendsOfPrestaSource implements AdvisorySource
 
     /**
      * Advisories that name an installed module but whose affected versions couldn't
-     * be read. They are not findings (that would be a guess), so they're listed here
-     * for the page to say so. Filled by find().
+     * be read. They are not findings (that would be a guess), so the report carries
+     * them as notes for the page to say so. Filled by find().
      *
-     * @return list<string>
+     * @return list<Note>
      */
-    public function unreadable(): array
+    public function notes(): array
     {
-        return $this->unreadable;
+        return array_values($this->notes);
     }
 
     public function find(array $packages, bool $fresh = false): array
     {
-        $this->unreadable = [];
+        $this->notes = [];
         $packages = array_values(array_filter($packages, static fn (InstalledPackage $p): bool => $p->ecosystem === Ecosystem::Extension));
         $index = $this->index($fresh);
         $matches = [];
@@ -84,7 +81,7 @@ final class FriendsOfPrestaSource implements AdvisorySource
                 }
 
                 if ($advisory['constraint'] === null) {
-                    $this->unreadable[$entry['url']] = $package->name . ': ' . $advisory['title'];
+                    $this->notes[$entry['url'] . '|' . $package->name] = new Note($advisory['title'], Ecosystem::Extension, $package->name, $this->site . $entry['url']);
 
                     continue;
                 }
@@ -114,8 +111,6 @@ final class FriendsOfPrestaSource implements AdvisorySource
                 ), $fixed);
             }
         }
-
-        $this->unreadable = array_values($this->unreadable);
 
         return $matches;
     }
@@ -170,12 +165,10 @@ final class FriendsOfPrestaSource implements AdvisorySource
         }
 
         $slug = "{$m[1]}-{$m[2]}-{$m[3]}-{$m[4]}";
-        $data = $this->cache->remember('fop.post.' . $slug, 604800, $fresh, function () use ($slug): array {
-            return self::parsePost($slug, $this->fetch($this->raw . $slug . '.md'));
-        });
+        $markdown = $this->cache->rememberText('fop.post.' . $slug, 604800, $fresh, fn (): string => $this->json->getText('Friends of Presta', $this->raw . $slug . '.md'));
 
-        /* @var array{id: string, title: string, cve: string|null, severity: string|null, date: string|null, constraint: string|null, fixed: string|null} $data */
-        return $data;
+        /* @var array{id: string, title: string, cve: string|null, severity: string|null, date: string|null, constraint: string|null, fixed: string|null} */
+        return self::parsePost($slug, $markdown);
     }
 
     /**
@@ -199,24 +192,6 @@ final class FriendsOfPrestaSource implements AdvisorySource
             'constraint' => $parsed['constraint'] ?? null,
             'fixed' => $parsed['fixed'] ?? null,
         ];
-    }
-
-    /**
-     * @throws SourceUnavailable
-     */
-    private function fetch(string $url): string
-    {
-        try {
-            $response = $this->http->sendRequest($this->requests->createRequest('GET', $url)->withHeader('User-Agent', JsonClient::USER_AGENT));
-        } catch (ClientExceptionInterface $e) {
-            throw SourceUnavailable::because('Friends of Presta', $e->getMessage(), $e);
-        }
-
-        if ($response->getStatusCode() !== 200) {
-            throw SourceUnavailable::because('Friends of Presta', 'an advisory page answered HTTP ' . $response->getStatusCode());
-        }
-
-        return (string) $response->getBody();
     }
 
     private static function severity(string $text): Severity

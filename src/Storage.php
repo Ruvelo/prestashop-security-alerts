@@ -19,14 +19,27 @@ interface Storage
     public function known(): array;
 
     /**
-     * Stores the report: new findings are added as not yet notified, a finding that
-     * just became exploited is flagged and not yet notified again, the resolved ones
-     * are dropped.
+     * The findings as last seen, by the key each was first stored under: what
+     * Reconciler::lastSeen() gave, so a finding is still recognised when a
+     * different source names its advisory differently.
+     *
+     * @return array<string, array<string, mixed>>
      */
-    public function apply(Report $report, Changes $changes): void;
+    public function lastSeen(): array;
 
     /**
-     * @return list<Finding> Findings nobody was told about yet
+     * Stores the report under the keys Reconciler::next() chose ($next, key =>
+     * exploited; $seen is Reconciler::lastSeen()): new findings are added as not yet
+     * notified, a finding that just became exploited is flagged and not yet notified
+     * again, and every stored key that is no longer in $next is dropped.
+     *
+     * @param array<string, bool> $next
+     * @param array<string, array<string, mixed>> $seen
+     */
+    public function apply(Report $report, Changes $changes, array $next, array $seen): void;
+
+    /**
+     * @return array<string, Finding> Findings nobody was told about yet, by their stored key
      */
     public function pending(): array;
 
