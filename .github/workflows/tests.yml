@@ -63,7 +63,7 @@ jobs:
       - name: Build
         run: bin/build-zip.sh build/ruvelo_securityalerts.zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ruvelo_securityalerts-zip
           path: build/ruvelo_securityalerts.zip
@@ -252,7 +252,7 @@ jobs:
           tail -n 60 "$RUNNER_TEMP/server.log" 2>/dev/null || true
           tail -n 80 shop/var/logs/*.log 2>/dev/null || true
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backoffice-${{ matrix.prestashop }}
